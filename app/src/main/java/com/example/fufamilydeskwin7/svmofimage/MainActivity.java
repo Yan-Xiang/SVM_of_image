@@ -36,17 +36,23 @@ import java.io.FileOutputStream;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "OCVSample::Activity";
-    private int imgcount=1,filenumber=1;
+    private int filenumber=1;
 
     private String[] filename = {"純地面(平地)", "含非地面", "含非地面/包含兩種以上的非地面物", "含非地面/柱子", "含非地面/腳照片"};
     private int[] maximgcount = {56, 5, 2, 7, 15};
     private int[] maxIMAGcount = {8, 5, 0, 1, 3};
     private float[][] all_image_value;
+    private int[][] svmresponse;
+    StringBuilder right = new StringBuilder();
+    StringBuilder left = new StringBuilder();
     StringBuilder valuetext = new StringBuilder();
+    StringBuilder imagevaluetext=new StringBuilder();
+    CvSVM svm;
+    CvSVMParams params;
 
 
-    private TextView textView, valuetextview;
-    private Button btn,addone,learn;
+    private TextView textViewleft, textviewright;
+    private Button btn, learn, inputbtn, outputbtn;
     private ImageView imageView;
 
     @Override
@@ -66,33 +72,90 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         });
 
         btn = (Button) findViewById(R.id.BTN);
-        addone = (Button) findViewById(R.id.add_one);
         learn = (Button) findViewById(R.id.Learn);
+        inputbtn = (Button) findViewById(R.id.inputbtn);
+        outputbtn = (Button) findViewById(R.id.outputbtn);
+
         imageView = (ImageView) findViewById(R.id.imageView);
-        textView = (TextView) findViewById(R.id.textView);
-        valuetextview = (TextView) findViewById(R.id.textView2);
+        textViewleft = (TextView) findViewById(R.id.textView);
+        textviewright = (TextView) findViewById(R.id.textView2);
 
         btn.setOnClickListener(this);
-        addone.setOnClickListener(this);
         learn.setOnClickListener(this);
+        inputbtn.setOnClickListener(this);
+        outputbtn.setOnClickListener(this);
+
+
+
     }
     @Override
     public void onClick(View v) {
         if (v == btn) {
-            String DataDirectory = Environment.getDataDirectory().toString();
-            Log.i(TAG, "Have sdcard ?" + String.valueOf(Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)));
-            Log.i(TAG, "getDataDirectory(): " + DataDirectory);
+            Log.i(TAG, "response star");
+            svmresponse = new int[200][5];
+            for (int row = 0; row <= filenumber; row++) {
+                Log.i(TAG, "row: " + String.valueOf(row));
+                //for (int col = 0; col <= 2; col++) {
+//                Log.i(TAG, "response "+String.valueOf(row)+" , "+String.valueOf(col));
+                //輸入圖片各個點的座標
+                Mat input = new Mat(1, 3, CvType.CV_32FC1, new Scalar(all_image_value[row][2], all_image_value[row][3], all_image_value[row][4]));
+                //一一比對，讓每個點都判斷過，畫出整張圖的結果
+                float response = svm.predict(input);
 
-            Log.i(TAG, "root: " + Environment.getRootDirectory().toString());
-            Log.i(TAG, "sdcard: " + Environment.getExternalStorageDirectory().toString());
+
+                if (response == 1) {
+                    //結果是1塗green
+                    svmresponse[row][0] = row;
+                    svmresponse[row][1] = 1;
+                    svmresponse[row][2] = (int) all_image_value[row][2];
+                    svmresponse[row][3] = (int) all_image_value[row][3];
+                    svmresponse[row][4] = (int) all_image_value[row][4];
+
+                } else if (response == -1) {
+                    //結果是-1塗red
+                    svmresponse[row][0] = row;
+                    svmresponse[row][1] = 0;
+                    svmresponse[row][2] = (int) all_image_value[row][2];
+                    svmresponse[row][3] = (int) all_image_value[row][3];
+                    svmresponse[row][4] = (int) all_image_value[row][4];
+
+                }
+//                Log.i(TAG, "response value: " + String.valueOf(response));
+            }
+            Log.i(TAG, "show value");
+
+            for (int i = 1; i <= filenumber; i++) {
+                left.append(String.valueOf(String.format("%-3.0f", all_image_value[i][0]))).append("  ");
+                left.append(String.valueOf(String.format("%-1.0f", all_image_value[i][1]))).append("  ");
+                left.append(String.valueOf(String.format("%-5.0f", all_image_value[i][2]))).append("  ");
+                left.append(String.valueOf(String.format("%-5.0f", all_image_value[i][3]))).append("  ");
+                left.append(String.valueOf(String.format("%-5.0f", all_image_value[i][4]))).append("  ");
+                left.append("\n");
+
+            }
+            for (int i = 1; i <= filenumber; i++) {
+                right.append(String.valueOf(String.format("%-3d", svmresponse[i][0]))).append("   ");
+                right.append(String.valueOf(String.format("%-1d", svmresponse[i][1]))).append("   ");
+                right.append(String.valueOf(String.format("%-5d", svmresponse[i][2]))).append("   ");
+                right.append(String.valueOf(String.format("%-5d", svmresponse[i][3]))).append("   ");
+                right.append(String.valueOf(String.format("%-5d", svmresponse[i][4]))).append("   ");
+                right.append("\n");
+
+            }
+            textViewleft.setText(left);
+            textviewright.setText(right);
+            outputbtn.setEnabled(true);
+
+            Log.i(TAG, "response finish");
+//            String DataDirectory = Environment.getDataDirectory().toString();
+//            Log.i(TAG, "Have sdcard ?" + String.valueOf(Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)));
+//            Log.i(TAG, "getDataDirectory(): " + DataDirectory);
+//
+//            Log.i(TAG, "root: " + Environment.getRootDirectory().toString());
+//            Log.i(TAG, "sdcard: " + Environment.getExternalStorageDirectory().toString());
 
 //            img.recycle();
 //            System.gc();
-        }else if (v == addone) {
-            imgcount++;
-            if (imgcount > 56) {
-                imgcount = 1;
-            }
         }else if (v == learn) {
             if (checkSDCard()) {
                 learn.setEnabled(false);
@@ -140,26 +203,26 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         valuetext.append("\n");
                     }
                 }
-                StringBuilder imagevaluetext=new StringBuilder();
-                for (int i = 0; i < 200; i++) {
-                    imagevaluetext.append(String.valueOf(all_image_value[i][0])+"  ");
-                    imagevaluetext.append(String.valueOf(all_image_value[i][1])+"  ");
-                    imagevaluetext.append(String.valueOf(all_image_value[i][2])+"  ");
-                    imagevaluetext.append(String.valueOf(all_image_value[i][3])+"  ");
-                    imagevaluetext.append(String.valueOf(all_image_value[i][4])+"  ");
+
+                for (int i = 0; i <= filenumber; i++) {
+                    imagevaluetext.append(String.valueOf(all_image_value[i][0])).append("  ");
+                    imagevaluetext.append(String.valueOf(all_image_value[i][1])).append("  ");
+                    imagevaluetext.append(String.valueOf(all_image_value[i][2])).append("  ");
+                    imagevaluetext.append(String.valueOf(all_image_value[i][3])).append("  ");
+                    imagevaluetext.append(String.valueOf(all_image_value[i][4])).append("  ");
                     imagevaluetext.append("\n");
                 }
 
 
-                textView.setText(valuetext);
-                valuetextview.setText(imagevaluetext);
+                textViewleft.setText(valuetext);
+                textviewright.setText(imagevaluetext);
 
 //                Log.i(TAG, "output to file finish");
 //                writeToFile("train.txt", valuetext.toString());
-                Mat trainingDataMat, responsesMat;
-                Log.i(TAG, "onClick");
-                trainingDataMat = new Mat(10, 2, CvType.CV_32FC1);
-                Log.i(TAG, "new Mat");
+                Log.i(TAG, "SVM star building training and labels");
+                Mat trainingDataMat, labelsMat;
+
+                trainingDataMat = new Mat(filenumber, 3, CvType.CV_32FC1);
                 for (int row = 0; row <= filenumber; row++) {
                     for (int col = 0; col <= 2; col++) {
                         //,put(int row, int col, data)
@@ -167,42 +230,43 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                     }
                 }
-                Log.i(TAG, "tain to Mat finish");
-                responsesMat = new Mat(10, 1, CvType.CV_32FC1);
-                Log.i(TAG, "new Mat-responsesMat");
+                labelsMat = new Mat(filenumber, 1, CvType.CV_32FC1);
                 for (int row = 0; row <= filenumber; row++) {
-                    for (int col = 0; col < 1; col++) {
+//                    for (int col = 0; col < 1; col++) {
 
                         //,put(int row, int col, data)
-                        responsesMat.put(row,col, all_image_value[row+1][1]);
-                    }
+                        labelsMat.put(row, 0, all_image_value[row + 1][1]);
+//                    }
                 }
-                Log.i(TAG, "labels to Mat finish");
+                Log.i(TAG, "train and label have built");
 //        svm = new CvSVM(trainingDataMat, responsesMat);
-                CvSVM svm;
-                CvSVMParams params;
+                Log.i(TAG, "SVM learning");
                 svm = new CvSVM();
                 params = new CvSVMParams();
-                Log.i(TAG, "new CvSVMParams");
+
                 //設定CvSVMParams
                 params.set_svm_type(CvSVM.C_SVC);
                 params.set_kernel_type(CvSVM.LINEAR);
                 params.set_term_crit(new TermCriteria(TermCriteria.MAX_ITER, 100, 1e-6));
-                Log.i(TAG, "params finish");
-
-                Log.i(TAG, "new CvSVM");
                 //做 SVM 訓練
-                svm.train(trainingDataMat, responsesMat, new Mat(), new Mat(), params);
-
-//        svm.train(trainingDataMat, responsesMat);
+                svm.train(trainingDataMat, labelsMat, new Mat(), new Mat(), params);
                 Log.i(TAG, "SVM train OK");
 
 
 
-
-
                 learn.setEnabled(true);
+                btn.setEnabled(true);
+                inputbtn.setEnabled(true);
             }
+        }else if (v == inputbtn) {
+
+            textViewleft.setText(valuetext);
+            textviewright.setText(imagevaluetext);
+
+        }else if (v == outputbtn) {
+            textViewleft.setText(left);
+            textviewright.setText(right);
+
         }
 
 
